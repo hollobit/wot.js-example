@@ -1,0 +1,29 @@
+{
+    "name": "demo10_rp_room_1",
+    "description": "Demo COEX room#1",
+    "version": "0.0.1",
+    "author": {
+        "name": "ETRI",
+        "email": "hollobit@etri.re.kr"
+    },
+    "engine": {
+        "node": "0.12.x"
+    },
+    "os": ["linux"],
+    "cpu": ["arm"],
+    "dependencies": {
+        "log4js": "0.6.26",
+        "noble": "1.1.0",
+        "lodash": "3.10.1",
+        "express": "4.13.3",
+        "async": "1.4.2",
+        "body-parser": ">=1.13.3"
+    },
+    "licenses": [
+        {
+            "type": "MIT",
+            "url": "https://github.com/nage-son/etri-wotjs-enhanced/blob/master/LICENSE.md"
+        }
+    ],
+    "keywords": ["IoT", "WoT"]
+}
