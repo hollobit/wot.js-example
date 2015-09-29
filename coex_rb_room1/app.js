@@ -5,7 +5,7 @@ var http = require('http');
 var express = require('express');
 var parser = require('body-parser');
 // var wot = require('wotjs');
-var wot = require('/home/pi/etri/wot-enhanced/wot');
+var wot = require('wotjs');
 var async = require('async');
 var _ = require('lodash');
 var log4js = require('log4js');
@@ -33,7 +33,27 @@ router.get('/temperatur/:id', function (req, res) {
 
     wot.getSensorValue(req.params.id, function (err, data) {
         result = data;
-        res.json(data);
+        res.json(result);
+    });
+});
+
+router.get('/light/:id', function (req, res) {
+    var result;
+
+    wot.getSensorValue(req.params.id, function (err, data) {
+        result = data;
+
+        res.json(result);
+    });
+});
+
+router.get('/humitidy/:id', function (req, res) {
+    var result;
+
+    wot.getSensorValue(req.params.id, function (err, data) {
+        result = data;
+
+        res.json(result);
     });
 });
 
@@ -56,11 +76,13 @@ async.series([
     function (done) {
         done();
 
-        var dht11 = 'sensorjs:///gpio/18/dht11/dht11-18';
+        var ds18b20 = 'sensorjs:///w1/28-000005559410/ds18b20/28-000005559410';
+        var bh1750fvi = 'sensorjs:///i2c/0x23/BH1750/BH1750-0x23';
+        var htu21d = 'sensorjs:///i2c/0x40/HTU21D/HTU21D-0x40';
 
-        wot.createSensor(dht11, function (error, data) {
+        wot.createSensor(ds18b20, function (error, data) {
             if (error) {
-                log.error('DHT11 registration fail!!!');
+                log.error('DS18B20 registration fail!!! -> ', error);
                 process.exit(1);
             } else {
                 // setInterval(function () {
@@ -70,6 +92,24 @@ async.series([
                 //         log.debug('################################');
                 //     });
                 // }, 3000);
+            }
+        });
+
+        wot.createSensor(bh1750fvi, function (error, data) {
+            if (error) {
+                log.error('BH1750 registration fail!!! -> ', error);
+                process.exit(1);
+            } else {
+
+            }
+        });
+
+        wot.createSensor(htu21d, function (error, data) {
+            if (error) {
+                log.error('HTU21D registration fail!! -> ', error);
+                process.exit(1);
+            } else {
+
             }
         });
     }

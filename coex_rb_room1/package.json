@@ -17,7 +17,8 @@
         "lodash": "3.10.1",
         "express": "4.13.3",
         "async": "1.4.2",
-        "body-parser": ">=1.13.3"
+        "body-parser": ">=1.13.3",
+        "wotjs": "git@github.com:nage-son/etri-wotjs-enhanced.git"
     },
     "licenses": [
         {
