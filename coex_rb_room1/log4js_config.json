@@ -13,8 +13,7 @@
             "type": "file",
             "filename": "logs/room1_log.log",
             "maxLogSize": 20480,
-            "backup": 3,
-            "category": "dht11"
+            "backup": 3
         }
     ]
 }
