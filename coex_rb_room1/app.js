@@ -1,5 +1,7 @@
 'use strict';
 
+var WPx_THING_ID = 'Swot-parlor';
+var IS_WPX = true;
 var express = require('express');
 var http = require('http');
 var express = require('express');
@@ -9,10 +11,39 @@ var wot = require('../etri/wot-enhanced/index');
 var async = require('async');
 var _ = require('lodash');
 var log4js = require('log4js');
+var fs = require('fs');
 
 log4js.configure(__dirname + '/log4js_config.json');
 
 var log = log4js.getLogger('Room1');
+
+var Campi = require('campi');
+var c = new Campi();
+var cameraOption = {
+    "encoding": "jpg",
+    "nopreview": true,
+    "timeout": 1,
+    "hflip": true,
+    "vflip": true,
+    "sh": 70000,
+    "width": 1024,
+    "height": 768,
+    "metering": "average"
+};
+
+var mailer = require('nodemailer');
+var mailTransport = mailer.createTransport({
+    service: 'Gmail',
+    auth: {
+        user: 'nage.dev@gmail.com',
+        pass: 'spdlwl123!@#$%'
+    }
+});
+
+var mailOption = {
+    from: 'nage.dev@gmail.com',
+    to: 'jhson@nagesoft.com'
+};
 
 var app = express();
 var port = process.env.PORT || 8088;
@@ -57,6 +88,142 @@ router.get('/humitidy/:id', function (req, res) {
     });
 });
 
+router.post('/camera/capture', function (req, res) {
+    try {
+        sendCaptureImage();
+
+        res.json({"status": "ok"});
+    } catch (e) {
+        res.json({"status": "error"});
+    }
+});
+
+// router.get('/wpx/taar', function (req, res) {
+//     var result;
+
+//     wot.getThingList(function (response) {
+//         result = JSON.parse(response.body);
+//         result = {"status": "ok", result: result}
+
+//         log.debug(result);
+
+//         res.json(result);
+//     });
+// });
+
+// @deprecated
+router.post('/wpx/taar', function (req, res) {
+    var result;
+
+    wot.addThing(function (response) {
+        log.debug('http code : ', response.statusCode);
+
+        switch (response.statusCode) {
+            case 204:
+                result = {"status": "ok"};
+                break;
+
+            case 400:
+                result = {"status": "error", message: "등록 정보에 오류가 있습니다."};
+                break;
+
+            case 409:
+                result = {"status": "error", message: "해당 사물은 이미 등록되었습니다."};
+                break;
+
+            case 500:
+                result = {"status": "error", message: "TaaR 서비스에 오류가 발생하였습니다"};
+                break;
+        }
+
+        res.json(result);
+    });
+});
+
+// @deprecated
+router.put('/wpx/taar', function (req, res) {
+    var result;
+
+    wot.updateThing(function (response) {
+        log.debug('http code : ', response.statusCode);
+
+        switch (response.statusCode) {
+            case 204:
+                result = {"status": "ok"};
+                break;
+
+            case 400:
+                result = {"status": "error", message: "수정 정보에 오류가 있습니다."};
+                break;
+
+            case 404:
+                result = {"status": "error", message: "해당 사물이 존재하지 않습니다."};
+                break;
+
+            case 500:
+            case 503:
+                result = {"status": "error", message: "TaaR 서비스에 오류가 발생하였습니다"};
+                break;
+        }
+
+        res.json(result);
+    });
+});
+
+// @deprecated
+router.delete('/wpx/taar', function (req, res) {
+    var result;
+
+    wot.deleteThing(function (response) {
+        log.debug('http code : ', response.statusCode);
+
+        switch (response.statusCode) {
+            case 204:
+                result = {"status": "ok"};
+                break;
+
+            case 404:
+                result = {"status": "error", message: "해당 사물이 존재하지 않습니다."};
+                break;
+
+            case 500:
+            case 503:
+                result = {"status": "error", message: "TaaR 서비스에 오류가 발생하였습니다"};
+                break;
+        }
+
+        res.json(result);
+    });
+});
+
+// @deprecated
+router.post('/wpx/raat', function (req, res) {
+    var result;
+
+    res.json({"status": "ok"});
+
+    // wot.deleteThing(function (response) {
+    //     log.debug('http code : ', response.statusCode);
+
+    //     switch (response.statusCode) {
+    //         case 204:
+    //             result = {"status": "ok"};
+    //             break;
+
+    //         case 404:
+    //             result = {"status": "error", message: "해당 사물이 존재하지 않습니다."};
+    //             break;
+
+    //         case 500:
+    //         case 503:
+    //             result = {"status": "error", message: "TaaR 서비스에 오류가 발생하였습니다"};
+    //             break;
+    //     }
+
+    //     res.json(result);
+    // });
+});
+
 app.use(router);
 
 var server = http.createServer(app);
@@ -69,7 +236,7 @@ async.series([
             reportInterval: netProfile && netProfile.reportingPeriod
         };
 
-        wot.init(server, options, done);
+        wot.init(WPx_THING_ID, server, options, done);
 
         log.info('WoT.js initialize.');
     },
@@ -88,15 +255,45 @@ async.series([
         // });
 
         client.on('sensorData', function (data) {
+            log.debug('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
             log.debug(data);
 
             if (data.type === 'motion') {
                 log.info('motion value >>> ', data.value);
 
-                var commands = [{pin: 18, command: (data.value === 1)? 'on': 'off'}];
+                if (data.value === 1) {
+                    try {
+                        sendCaptureImage();
+                    } catch (e) {
+                        // TODO: 예외처리.
+                    }
+                }
 
-                wot.setActurators('gpio', 'rgbLed', commands, null);
+                // var commands = [{pin: 18, command: (data.value === 1)? 'on': 'off'}];
+
+                // wot.setActuators('gpio', 'rgbLed', commands, null);
             }
+
+            // wot.updateSensorData(data.id, data.value, function (response) {
+            //     var result;
+
+            //     switch (response.statusCode) {
+            //         case 204:
+            //             result = {"status": "ok"};
+            //             break;
+
+            //         case 404:
+            //             result = {"status": "error", message: "해당 사물이 존재하지 않습니다."};
+            //             break;
+
+            //         case 500:
+            //         case 503:
+            //             result = {"status": "error", message: "TaaR 서비스에 오류가 발생하였습니다"};
+            //             break;
+            //     }
+
+            //     log.info('Post sensor data result : ', result);
+            // });
         });
 
         client.on('disconnect', function () {
@@ -124,7 +321,7 @@ async.series([
         var ds18b20 = 'sensorjs:///w1/28-000005559410/ds18b20/28-000005559410';
         var bh1750fvi = 'sensorjs:///i2c/0x23/BH1750/BH1750-0x23';
         var htu21d = 'sensorjs:///i2c/0x40/HTU21D/HTU21D-0x40';
-        var led = 'sensorjs:///gpio/18/rgbLed/rgbLed-18';
+        // var led = 'sensorjs:///gpio/18/rgbLed/rgbLed-18';
         var motion = 'sensorjs:///gpio/24/motionDetector/motion-24';
 
         wot.createSensor(ds18b20, function (error, data) {
@@ -168,6 +365,17 @@ async.series([
 
             }
         });
+    },
+    function (done) {
+        done();
+
+        if (IS_WPX) {
+            // WPx 연동일 경우 thing으로 등록
+            // wot.addThing(function (result) {
+            //     log.debug('Add WPx result >>> ', result);
+            //     // res.json({"status": "ok", "result": result});
+            // });
+        }
     }
 ], function (error) {
         if (error) {
@@ -182,3 +390,35 @@ async.series([
         log.debug('debug');
     }
 );
+
+function sendCaptureImage() {
+    // var filename = 'c_' + new Date().getTime() + '.jpg';
+    // var fileFullPath = './' + filename;
+
+    // c.getImageAsFile(cameraOption, fileFullPath, function (err){
+    //     if (err) {
+    //         log.error('Camera error >>> ', err);
+
+    //         throw new Error('camera capture fail.');
+    //     }
+
+    //     mailOption.subject = 'Capture image';
+    //     mailOption.attachments = [
+    //         {
+    //             fileName: filename,
+    //             content: fs.createReadStream(fileFullPath),
+    //             contentType: 'image/jpeg'
+    //         }
+    //     ];
+
+    //     mailTransport.sendMail(mailOption, function (err, response) {
+    //         if (err) {
+    //             log.error('메일발송 실패 >>> ', err);
+
+    //             throw new Error('mail send fail.');
+    //         }
+
+    //         mailTransport.close();
+    //     });
+    // });
+}
