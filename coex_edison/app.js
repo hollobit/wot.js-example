@@ -7,7 +7,7 @@ var http = require('http');
 var express = require('express');
 var parser = require('body-parser');
 var wot = require('wotjs');
-// var wot = require('wotjs');
+// var wot = require('../etri/wot-enhanced/index');
 var async = require('async');
 var _ = require('lodash');
 var log4js = require('log4js');
@@ -324,20 +324,20 @@ async.series([
         // var led = 'sensorjs:///gpio/18/rgbLed/rgbLed-18';
         var motion = 'sensorjs:///gpio/24/motionDetector/motion-24';
 
-        wot.createSensor(ds18b20, function (error, data) {
-            if (error) {
-                log.error('DS18B20 registration fail!!! -> ', error);
-                process.exit(1);
-            } else {
-                // setInterval(function () {
-                //     log.debug('################################');
-                //     wot.getSensorValue('dht11-18', function (err, data) {
-                //         log.info('DHT11 data : ', data);
-                //         log.debug('################################');
-                //     });
-                // }, 3000);
-            }
-        });
+        // wot.createSensor(ds18b20, function (error, data) {
+        //     if (error) {
+        //         log.error('DS18B20 registration fail!!! -> ', error);
+        //         process.exit(1);
+        //     } else {
+        //         // setInterval(function () {
+        //         //     log.debug('################################');
+        //         //     wot.getSensorValue('dht11-18', function (err, data) {
+        //         //         log.info('DHT11 data : ', data);
+        //         //         log.debug('################################');
+        //         //     });
+        //         // }, 3000);
+        //     }
+        // });
 
         wot.createSensor(bh1750fvi, function (error, data) {
             if (error) {
@@ -348,23 +348,23 @@ async.series([
             }
         });
 
-        wot.createSensor(htu21d, function (error, data) {
-            if (error) {
-                log.error('HTU21D registration fail!! -> ', error);
-                process.exit(1);
-            } else {
+        // wot.createSensor(htu21d, function (error, data) {
+        //     if (error) {
+        //         log.error('HTU21D registration fail!! -> ', error);
+        //         process.exit(1);
+        //     } else {
 
-            }
-        });
+        //     }
+        // });
 
-        wot.createSensor(motion, function (error, data) {
-            if (error) {
-                log.error('Motion registration fail!!! -> ', error);
-                process.exit(1);
-            } else {
+        // wot.createSensor(motion, function (error, data) {
+        //     if (error) {
+        //         log.error('Motion registration fail!!! -> ', error);
+        //         process.exit(1);
+        //     } else {
 
-            }
-        });
+        //     }
+        // });
     },
     function (done) {
         done();
