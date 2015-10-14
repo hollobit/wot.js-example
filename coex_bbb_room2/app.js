@@ -318,7 +318,7 @@ async.series([
     function (done) {
         done();
 
-        var ds18b20 = 'sensorjs:///w1/28-041501d89bff/ds18b20/28-041501d89bff';
+        var ds18b20 = 'sensorjs:///w1/28-0415021d6aff/ds18b20/28-0415021d6aff';
         var bh1750fvi = 'sensorjs:///i2c/0x23/BH1750/BH1750-0x23';
         var htu21d = 'sensorjs:///i2c/0x40/HTU21D/HTU21D-0x40';
         // var led = 'sensorjs:///gpio/18/rgbLed/rgbLed-18';
