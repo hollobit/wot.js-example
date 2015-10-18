@@ -6,12 +6,23 @@ var express = require('express');
 var http = require('http');
 var express = require('express');
 var parser = require('body-parser');
-var wot = require('wotjs');
-// var wot = require('../etri/wot-enhanced/index');
+// var wot = require('wotjs');
+var wot = require('../etri/wot-enhanced/index');
 var async = require('async');
 var _ = require('lodash');
 var log4js = require('log4js');
 var fs = require('fs');
+
+//------------------------------------------
+// BLE
+//------------------------------------------
+var noble = require('noble');
+var PERIPHERAL_ID = 'd03972c8b8f4';
+var SERVICE_UUID = 'fff0';
+var CHARACTERISTIC = 'fff2';
+var COMMAND_ON = '0xF';
+var COMMAND_OFF = '0xA';
+var CHARACTERISTIC_TARGET;
 
 log4js.configure(__dirname + '/log4js_config.json');
 
@@ -95,6 +106,38 @@ router.post('/camera/capture', function (req, res) {
         res.json({"status": "ok"});
     } catch (e) {
         res.json({"status": "error"});
+    }
+});
+
+router.post('/ble/light', function (req, res) {
+    if (!CHARACTERISTIC_TARGET) {
+        res.json({"status": "wait", "message": "Scanning..."});
+    } else {
+        var buffer = new Buffer(1);
+
+        if (req.body.command === 'ON') {
+            buffer.writeUInt8(COMMAND_ON, 0);
+
+            CHARACTERISTIC_TARGET.write(buffer, false, function (error) {
+                if (error) {
+                    res.json({"status": "error"});
+                } else {
+                    res.json({"status": "ok"});
+                }
+            });
+        } else if (req.body.command === 'OFF') {
+            buffer.writeUInt8(COMMAND_OFF, 0);
+
+            CHARACTERISTIC_TARGET.write(buffer, false, function (error) {
+                if (error) {
+                    res.json({"status": "error"});
+                } else {
+                    res.json({"status": "ok"});
+                }
+            });
+        } else {
+            res.json({"status": "error", "message": "Invalid command."});
+        }
     }
 });
 
@@ -230,6 +273,81 @@ var server = http.createServer(app);
 var netProfile;
 
 async.series([
+    function (done) {
+        done();
+        noble.on('stateChange', function (state) {
+            if (state === 'poweredOn') {
+                noble.startScanning();
+            } else {
+                console.log('Power off.');
+                noble.stopScanning();
+            }
+        });
+
+        noble.on('scanStart', function () {
+            log.info('BLE bulb scan start.'); 
+        });
+
+        noble.on('scanStop', function () {
+            log.info('BLE bulb scan stop.');
+        });
+
+        noble.on('discover', function (peripheral) {
+            peripheral.on('connect', function () {
+                log.info('Connected to bulb.');
+            });
+
+            peripheral.on('disconnect', function () {
+                log.info('Disconnected to bulb.');
+            });
+
+            if (peripheral.id === PERIPHERAL_ID) {
+                peripheral.connect(function (error) {
+                    if (error) {
+                        log.fatal('Connect bulb error >>> ' + error);
+
+                        peripheral.disconnect();
+
+                        process.exit(1);
+                    }
+
+                    log.info('Bulb connected.');
+
+                    peripheral.discoverServices([SERVICE_UUID], function (error, services) {
+                        if (error) {
+                            log.fatal('Discover bulb service error >>> ', error);
+
+                            peripheral.disconnect();
+
+                            process.exit(1);
+                        }
+
+                        var service = services[0];
+
+                        log.info('Bulb service connected.');
+
+                        // console.log(service);
+
+                        service.discoverCharacteristics([CHARACTERISTIC], function (error, characteristics) {
+                            if (error) {
+                                log.fatal('Discover bulb characteristic error >>> ', error);
+
+                                peripheral.disconnect();
+
+                                process.exit(1);
+                            }
+
+                            var characteristic = characteristics[0];
+
+                            CHARACTERISTIC_TARGET = characteristics[0];
+
+                            log.info('Bulb characteristic connected.');
+                        });
+                    });
+                });
+            }
+        });
+    },
     function (done) {
         var options = {
             websocketTopic: 'sensorData',
