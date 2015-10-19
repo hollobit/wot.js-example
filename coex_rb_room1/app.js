@@ -88,9 +88,27 @@ router.get('/humitidy/:id', function (req, res) {
     });
 });
 
-router.post('/camera/capture', function (req, res) {
+router.post('/camera', function (req, res) {
     try {
-        sendCaptureImage();
+        captureImage(function (filename, fileFullPath) {
+            log.debug('saved file >>> ', filename, fileFullPath);
+        });
+
+        res.json({"status": "ok"});
+    } catch (e) {
+        res.json({"status": "error"});
+    }
+});
+
+router.post('/camera/sendCapture', function (req, res) {
+    try {
+        if (!req.body.receiver) {
+            res.json({"status": "error", "message": "Receiver email is empty."});
+        } else {
+            captureImage(function (filename, fileFullPath) {
+                sendCaptureImage(req.body.receiver, filename, fileFullPath);
+            });
+        }
 
         res.json({"status": "ok"});
     } catch (e) {
@@ -391,34 +409,40 @@ async.series([
     }
 );
 
-function sendCaptureImage() {
-    // var filename = 'c_' + new Date().getTime() + '.jpg';
-    // var fileFullPath = './' + filename;
+function sendCaptureImage(receiver, filename, fileFullPath) {
+    mailOption.subject = 'Capture image';
+    mailOption.attachments = [
+        {
+            fileName: filename,
+            content: fs.createReadStream(fileFullPath),
+            contentType: 'image/jpeg'
+        }
+    ];
 
-    // c.getImageAsFile(cameraOption, fileFullPath, function (err){
-    //     if (err) {
-    //         log.error('Camera error >>> ', err);
+    mailTransport.sendMail(mailOption, function (err, response) {
+        if (err) {
+            log.error('메일발송 실패 >>> ', err);
 
-    //         throw new Error('camera capture fail.');
-    //     }
+            throw new Error('mail send fail.');
+        }
 
-    //     mailOption.subject = 'Capture image';
-    //     mailOption.attachments = [
-    //         {
-    //             fileName: filename,
-    //             content: fs.createReadStream(fileFullPath),
-    //             contentType: 'image/jpeg'
-    //         }
-    //     ];
+        mailTransport.close();
+    });
+}
 
-    //     mailTransport.sendMail(mailOption, function (err, response) {
-    //         if (err) {
-    //             log.error('메일발송 실패 >>> ', err);
+function captureImage(callback) {
+    var filename = 'c_' + new Date().getTime() + '.jpg';
+    var fileFullPath = './' + filename;
 
-    //             throw new Error('mail send fail.');
-    //         }
+    c.getImageAsFile(cameraOption, fileFullPath, function (err){
+        if (err) {
+            log.error('Camera error >>> ', err);
 
-    //         mailTransport.close();
-    //     });
-    // });
+            throw new Error('camera capture fail.');
+        }
+
+        if (callback) {
+            callback(filename, fileFullPath);
+        }
+    });
 }
