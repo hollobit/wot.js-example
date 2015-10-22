@@ -12,6 +12,10 @@ var async = require('async');
 var _ = require('lodash');
 var log4js = require('log4js');
 var fs = require('fs');
+var nodeList = [];
+var ip = require('ip');
+var request = require('request');
+var moment = require('moment')();
 
 //------------------------------------------
 // BLE
@@ -26,21 +30,10 @@ var CHARACTERISTIC_TARGET;
 
 log4js.configure(__dirname + '/log4js_config.json');
 
-var log = log4js.getLogger('Room1');
+var log = log4js.getLogger('Gateway');
 
 var Campi = require('campi');
 var c = new Campi();
-var cameraOption = {
-    "encoding": "jpg",
-    "nopreview": true,
-    "timeout": 1,
-    "hflip": true,
-    "vflip": true,
-    "sh": 70000,
-    "width": 1024,
-    "height": 768,
-    "metering": "average"
-};
 
 var mailer = require('nodemailer');
 var mailTransport = mailer.createTransport({
@@ -66,7 +59,7 @@ app.set('port', port);
 var router = express.Router();
 
 router.use(function (req, res, next) {
-    console.log('wot call---');
+    log.debug('wot call---');
     next();
 });
 
@@ -99,16 +92,6 @@ router.get('/humitidy/:id', function (req, res) {
     });
 });
 
-router.post('/camera/capture', function (req, res) {
-    try {
-        sendCaptureImage();
-
-        res.json({"status": "ok"});
-    } catch (e) {
-        res.json({"status": "error"});
-    }
-});
-
 router.post('/ble/light', function (req, res) {
     if (!CHARACTERISTIC_TARGET) {
         res.json({"status": "wait", "message": "Scanning..."});
@@ -139,6 +122,101 @@ router.post('/ble/light', function (req, res) {
             res.json({"status": "error", "message": "Invalid command."});
         }
     }
+});
+
+router.post('/node', function (req, res) {
+    var result = _.find(nodeList, req.body);
+
+    if (!result) {
+        nodeList.push(req.body);
+
+        res.json({"status": "ok"});
+    } else {
+        res.json({"status": "error", "message": "duplicate"});
+    }
+});
+
+router.post('/wotkit/:thingID', function (req, res) {
+    var thingID = req.params.thingID;
+    var operation = req.body.opType;
+    var targets = req.body.targets;
+    var thing;
+
+    for (var i = 0; i < nodeList.length; i++) {
+        if (nodeList[i].id === thingID) {
+            thing = nodeList[i].data;
+
+            break;
+        }
+    }
+
+    // TODO: 등록된 thing이 아닐 경우는?
+    log.debug('thing id >>> ', thing.metadata.id);
+
+    var loopStatus = true;
+
+    for (var i = 0; i < targets.length; i++) {
+        var t = targets[i];
+        var r;
+
+        for (var y = 0; y < thing.metadata.resources.length; y++) {
+            var r = thing.metadata.resources[y];
+
+            if (r.id.toLowerCase() === t) {
+                var requestOption = {
+                    url: 'http://192.168.88.10:8088/camera/sendCapture',
+                    method: 'post'
+                };
+
+                var sendData = {"receiver": req.body.state.email};
+
+                log.debug('receiver >>> ', req.body.state.email);
+
+                requestOption.json = sendData;
+
+                log.debug('send capture data >>> ', sendData);
+
+                request(requestOption, function (error, response, body) {
+                    if (error || response.statusCode != 200) {
+                        log.error('Send fail >>> ', error);
+
+                        res.json({
+                            "opType": "setState",
+                            "results": {
+                                "camera": {
+                                    "status": "error",
+                                    "time": moment.format('YYYYMMDDhhmmss')
+                                }
+                            }
+                        });
+                    } else {
+                        res.json({
+                            "opType": "setState",
+                            "results": {
+                                "camera": {
+                                    "status": "success",
+                                    "time": moment.format('YYYYMMDDhhmmss')
+                                }
+                            }
+                        });
+                    }
+                });
+
+                loopStatus = false;
+
+                break;
+            }
+        }
+
+        if (!loopStatus) {
+            break;
+        }
+    }
+});
+
+router.post('/node/sensorData', function (req, res) {
+    // TODO: 완료할 것.
+    res.json({"status": "ok"});
 });
 
 // router.get('/wpx/taar', function (req, res) {
@@ -279,7 +357,6 @@ async.series([
             if (state === 'poweredOn') {
                 noble.startScanning();
             } else {
-                console.log('Power off.');
                 noble.stopScanning();
             }
         });
@@ -325,8 +402,6 @@ async.series([
                         var service = services[0];
 
                         log.info('Bulb service connected.');
-
-                        // console.log(service);
 
                         service.discoverCharacteristics([CHARACTERISTIC], function (error, characteristics) {
                             if (error) {
@@ -486,14 +561,6 @@ async.series([
     },
     function (done) {
         done();
-
-        if (IS_WPX) {
-            // WPx 연동일 경우 thing으로 등록
-            // wot.addThing(function (result) {
-            //     log.debug('Add WPx result >>> ', result);
-            //     // res.json({"status": "ok", "result": result});
-            // });
-        }
     }
 ], function (error) {
         if (error) {
@@ -506,37 +573,42 @@ async.series([
         // app.listen(port);
         log.info('Server start - [%s]', app.get('port'));
         log.debug('debug');
+
+        addThing();
     }
 );
 
-function sendCaptureImage() {
-    // var filename = 'c_' + new Date().getTime() + '.jpg';
-    // var fileFullPath = './' + filename;
+function addThing() {
+    wot.addThing('Intel', 'Intel_Edison_with_Arduino', 'Parlor', null, function (response) {
+        if (response.statusCode === 204) {
+            // edison에 전송
 
-    // c.getImageAsFile(cameraOption, fileFullPath, function (err){
-    //     if (err) {
-    //         log.error('Camera error >>> ', err);
+            var thingData = {"ip": ip.address(), "id": WPx_THING_ID, "data": wot.getThing(WPx_THING_ID)};
 
-    //         throw new Error('camera capture fail.');
-    //     }
+            var requestOption = {
+                url: 'http://192.168.88.9:8088/node',
+                method: 'post'
+            };
 
-    //     mailOption.subject = 'Capture image';
-    //     mailOption.attachments = [
-    //         {
-    //             fileName: filename,
-    //             content: fs.createReadStream(fileFullPath),
-    //             contentType: 'image/jpeg'
-    //         }
-    //     ];
+            requestOption.json = thingData;
 
-    //     mailTransport.sendMail(mailOption, function (err, response) {
-    //         if (err) {
-    //             log.error('메일발송 실패 >>> ', err);
-
-    //             throw new Error('mail send fail.');
-    //         }
-
-    //         mailTransport.close();
-    //     });
-    // });
+            request(requestOption, function (error, response, body) {
+                if (error || response.statusCode != 200) {
+                    log.error('Send fail------------', error);
+                } else {
+                    log.info('Send added thing to gateway success.');
+                }
+            });
+        } else if (response.statusCode === 409) {
+            log.error('^^^^^^^^^^^^^^^^^^^^^^^');
+            log.error('기존 사물 등록되어 있음.');
+            // 기존 등록 삭제 처리
+            wot.deleteThing(function (response) {
+                log.debug('삭제처리 결과 >>> ', response.statusCode);
+                if (response.statusCode === 204) {
+                    addThing();
+                }
+            });
+        }
+    });
 }
