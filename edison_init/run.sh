@@ -23,5 +23,5 @@ echo mode1 > /sys/kernel/debug/gpio_debug/gpio28/current_pinmux
 echo mode1 > /sys/kernel/debug/gpio_debug/gpio27/current_pinmux 
 echo high > /sys/class/gpio/gpio214/direction
 
-rfill unblock bluetooth
+rfkill unblock bluetooth
 hciconfig hci0 up
