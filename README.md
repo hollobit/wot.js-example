@@ -26,9 +26,8 @@
 BBB(Beaglebone Black)의 W1 사용을 위한 초기 설정 shell script가 위치합니다.
 
 2. codex_bbb_room  
-IoT Week 2015용 Beaglebone Black에 적용된 application으로 다음 4가지의 센서를 장착하고 있습니다. 시연시 사용한 cape 정보는 [NeuroMeka](http://wiki.neuromeka.net/index.php?title=SensorCape)에서 확인하실 수 있습니다.
-
-[README 확인](./codex_bbb_room/README.md)
+IoT Week 2015용 Beaglebone Black에 적용된 application으로 다음 4가지의 센서를 장착하고 있습니다. 시연시 사용한 cape 정보는 [NeuroMeka](http://wiki.neuromeka.net/index.php?title=SensorCape)에서 확인하실 수 있습니다.  
+[README 확인](./tree/master/coex_bbb_room)
 
 3. coex_edison_gateway
 
