@@ -30,8 +30,7 @@ BBB(Beaglebone Black)의 W1 사용을 위한 초기 설정 shell script가 위�
 시연시 사용한 cape 정보는 [NeuroMeka](http://wiki.neuromeka.net/index.php?title=SensorCape)에서 확인하실 수 있습니다. 온도, 습도, 조도, 모션센서를 이용합니다.
 
 3. coex_edison_gateway  
-Intel Edison + Arduino 쉴드에 BH1750 조도 센서를 장착하였습니다. gateway 역할을 하며, Web Application을 제공하여 각 보드의 센서 파악 및 엑츄에이터(카메라, BLE Blub)등을 제어할 수 있습니다.
-
+Intel Edison + Arduino 쉴드에 BH1750 조도 센서를 장착하였습니다. gateway 역할을 하며, Web Application을 제공하여 각 보드의 센서 파악 및 엑츄에이터(카메라, BLE Blub)등을 제어할 수 있습니다.  
 ![WoT Demo Web Application](https://docs.google.com/uc?id=0B02RRVY3KrmeSlVSR0JuNmxaMW8)
 
 4. codex_rb_enterence  
