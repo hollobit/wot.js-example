@@ -1,0 +1,19 @@
+{
+    "levels": {
+        "Gateway": "DEBUG",
+        "Room2": "DEBUG",
+        "ActuratorHue": "DEBUG"
+    },
+    "replaceConsole": true,
+    "appenders": [
+        {
+            "type": "console"
+        },
+        {
+            "type": "file",
+            "filename": "logs/room2_log.log",
+            "maxLogSize": 20480,
+            "backup": 3
+        }
+    ]
+}

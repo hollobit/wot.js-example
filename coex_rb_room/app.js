@@ -1,7 +1,8 @@
 'use strict';
 
-var WPx_THING_ID = 'Swot-parlor';
+var WPx_THING_ID = 'Swot-room1';
 var IS_WPX = true;
+var express = require('express');
 var http = require('http');
 var express = require('express');
 var parser = require('body-parser');
@@ -11,28 +12,37 @@ var async = require('async');
 var _ = require('lodash');
 var log4js = require('log4js');
 var fs = require('fs');
-var nodeList = [];
-var ip = require('ip');
 var request = require('request');
-var moment = require('moment')();
+var ip = require('ip');
+
+log4js.configure(__dirname + '/log4js_config.json');
+
+var log = log4js.getLogger('Room1');
 
 //------------------------------------------
 // BLE
 //------------------------------------------
 var noble = require('noble');
-var PERIPHERAL_ID = 'd03972c866c5';
+var PERIPHERAL_ID = 'd03972a49123'; //DCF31A460555 
 var SERVICE_UUID = 'fff0';
 var CHARACTERISTIC = 'fff2';
 var COMMAND_ON = '0xF';
 var COMMAND_OFF = '0xA';
 var CHARACTERISTIC_TARGET;
 
-log4js.configure(__dirname + '/log4js_config.json');
-
-var log = log4js.getLogger('Gateway');
-
 var Campi = require('campi');
 var c = new Campi();
+var cameraOption = {
+    "encoding": "jpg",
+    "nopreview": true,
+    "timeout": 1,
+    "hflip": false,
+    "vflip": false,
+    "sh": 70000,
+    "width": 1024,
+    "height": 768,
+    "metering": "average"
+};
 
 var mailer = require('nodemailer');
 var mailTransport = mailer.createTransport({
@@ -55,13 +65,12 @@ var port = process.env.PORT || 8088;
 app.use(parser.urlencoded());
 app.use(parser.json());
 app.set('port', port);
-app.use(express.static('web'));
 app.use(cors());
 
 var router = express.Router();
 
 router.use(function (req, res, next) {
-    log.debug('wot call---');
+    console.log('wot call---');
     next();
 });
 
@@ -94,6 +103,35 @@ router.get('/humitidy/:id', function (req, res) {
     });
 });
 
+router.post('/camera', function (req, res) {
+    try {
+        captureImage(function (filename, fileFullPath) {
+            log.debug('saved file >>> ', filename, fileFullPath);
+        });
+
+        res.json({"status": "ok"});
+    } catch (e) {
+        res.json({"status": "error"});
+    }
+});
+
+router.post('/camera/sendCapture', function (req, res) {
+    try {
+        if (!req.body.receiver) {
+            res.json({"status": "error", "message": "Receiver email is empty."});
+        } else {
+            log.debug('receiver >>> ', req.body.receiver);
+            captureImage(function (filename, fileFullPath) {
+                sendCaptureImage(req.body.receiver, filename, fileFullPath);
+            });
+        }
+
+        res.json({"status": "ok"});
+    } catch (e) {
+        res.json({"status": "error"});
+    }
+});
+
 router.post('/ble/light', function (req, res) {
     if (!CHARACTERISTIC_TARGET) {
         res.json({"status": "wait", "message": "Scanning..."});
@@ -124,150 +162,6 @@ router.post('/ble/light', function (req, res) {
             res.json({"status": "error", "message": "Invalid command."});
         }
     }
-});
-
-router.post('/node', function (req, res) {
-    var result = _.find(nodeList, req.body);
-
-    if (!result) {
-        nodeList.push(req.body);
-
-        var client = require('socket.io-client')('http://' + req.body.ip + ':8088', {
-            reconnection: true,
-            reconnectionDelay: 500
-        });
-
-        client.on('sensorData', function (data) {
-            log.debug('====================================================');
-            log.debug('sensor data from : ', req.body.ip);
-            log.debug(data);
-        });
-
-        client.on('disconnect', function () {
-            log.info('*********************************');
-            log.info('Socket closed.');
-            log.info('*********************************');
-        });
-
-        client.on('reconnecting', function () {
-            log.info('Try reconnecting socket...');
-        });
-
-        client.on('reconnect', function () {
-            log.info('Reconnect success!');
-        });
-
-        client.on('reconnect_error', function() {
-            log.fatal('Reconnect socket failed.\nExit.');
-        });
-
-        res.json({"status": "ok"});
-    } else {
-        res.json({"status": "error", "message": "duplicate"});
-    }
-});
-
-router.post('/wotkit/:thingID', function (req, res) {
-    var thingID = req.params.thingID;
-    var operation = req.body.opType;
-    var targets = req.body.targets;
-    var thing;
-
-    for (var i = 0; i < nodeList.length; i++) {
-        if (nodeList[i].id === thingID) {
-            thing = nodeList[i].data;
-
-            break;
-        }
-    }
-
-    if (!thing) {
-        return;
-    }
-
-    // TODO: 등록된 thing이 아닐 경우는?
-    log.debug('thing id >>> ', thing.metadata.id);
-
-    var loopStatus = true;
-
-    for (var i = 0; i < targets.length; i++) {
-        var t = targets[i];
-        var r;
-
-        for (var y = 0; y < thing.metadata.resources.length; y++) {
-            var r = thing.metadata.resources[y];
-
-            if (r.id.toLowerCase() === t) {
-                if (r.id.toLowerCase() === 'camera') {
-                    var requestOption = {
-                        url: 'http://192.168.99.10:8088/camera/sendCapture',
-                        method: 'post'
-                    };
-
-                    var sendData = {"receiver": req.body.state.email};
-
-                    log.debug('receiver >>> ', req.body.state.email);
-
-                    requestOption.json = sendData;
-
-                    log.debug('send capture data >>> ', sendData);
-
-                    request(requestOption, function (error, response, body) {
-                        if (error || response.statusCode != 200) {
-                            log.error('Send fail >>> ', error);
-
-                            res.json({
-                                "opType": "setState",
-                                "results": {
-                                    "camera": {
-                                        "status": "error",
-                                        "time": moment.format('YYYYMMDDhhmmss')
-                                    }
-                                }
-                            });
-                        } else {
-                            res.json({
-                                "opType": "setState",
-                                "results": {
-                                    "camera": {
-                                        "status": "success",
-                                        "time": moment.format('YYYYMMDDhhmmss')
-                                    }
-                                }
-                            });
-                        }
-                    });
-                } else if (r.id.toLowerCase() === 'bulb') {
-                    var url = (thingID === 'Swot-parlor')? 'http://192.168.99.9:8088/ble/light': 'http://192.168.99.12:8088/ble/light';
-                    var command;
-
-                    if (req.body.state.on) {
-                        command.command = "ON";
-                    } else {
-                        command.command = "OFF";
-                    }
-
-                    var requestOption = {
-                        url: url,
-                        method: 'post'
-                    };
-
-                    requestOption.json = command;
-
-                    request(requestOption, function (error, response, body) {
-                        if (error || response.statusCode != 200) {
-                            log.error('Send fail');
-                        }
-                    });
-                }
-            }
-        }
-    }
-});
-
-router.post('/node/sensorData', function (req, res) {
-    // TODO: 완료할 것.
-    res.json({"status": "ok"});
 });
 
 // router.get('/wpx/taar', function (req, res) {
@@ -427,8 +321,6 @@ async.series([
 
             peripheral.on('disconnect', function () {
                 log.info('Disconnected to bulb.');
-
-                noble.startScanning();
             });
 
             if (peripheral.id === PERIPHERAL_ID) {
@@ -515,6 +407,43 @@ async.series([
                     log.error('Send data to Edison(192.168.99.9) fail!');
                 }
             });
+
+            // if (data.type === 'motion') {
+            //     log.info('motion value >>> ', data.value);
+
+            //     if (data.value === 1) {
+            //         try {
+            //             sendCaptureImage();
+            //         } catch (e) {
+            //             // TODO: 예외처리.
+            //         }
+            //     }
+
+            //     // var commands = [{pin: 18, command: (data.value === 1)? 'on': 'off'}];
+
+            //     // wot.setActuators('gpio', 'rgbLed', commands, null);
+            // }
+
+            // wot.updateSensorData(data.id, data.value, function (response) {
+            //     var result;
+
+            //     switch (response.statusCode) {
+            //         case 204:
+            //             result = {"status": "ok"};
+            //             break;
+
+            //         case 404:
+            //             result = {"status": "error", message: "해당 사물이 존재하지 않습니다."};
+            //             break;
+
+            //         case 500:
+            //         case 503:
+            //             result = {"status": "error", message: "TaaR 서비스에 오류가 발생하였습니다"};
+            //             break;
+            //     }
+
+            //     log.info('Post sensor data result : ', result);
+            // });
         });
 
         client.on('disconnect', function () {
@@ -533,32 +462,31 @@ async.series([
 
         client.on('reconnect_error', function() {
             log.fatal('Reconnect socket failed.\nExit.');
-            process.exit(1);
         });
     },
     function (done) {
         done();
 
-        var ds18b20 = 'sensorjs:///w1/28-000005559410/ds18b20/28-000005559410';
+        var ds18b20 = 'sensorjs:///w1/28-00000432ae11/ds18b20/28-00000432ae11';
         var bh1750fvi = 'sensorjs:///i2c/0x23/BH1750/BH1750-0x23';
         var htu21d = 'sensorjs:///i2c/0x40/HTU21D/HTU21D-0x40';
         // var led = 'sensorjs:///gpio/18/rgbLed/rgbLed-18';
         var motion = 'sensorjs:///gpio/24/motionDetector/motion-24';
 
-        // wot.createSensor(ds18b20, function (error, data) {
-        //     if (error) {
-        //         log.error('DS18B20 registration fail!!! -> ', error);
-        //         process.exit(1);
-        //     } else {
-        //         // setInterval(function () {
-        //         //     log.debug('################################');
-        //         //     wot.getSensorValue('dht11-18', function (err, data) {
-        //         //         log.info('DHT11 data : ', data);
-        //         //         log.debug('################################');
-        //         //     });
-        //         // }, 3000);
-        //     }
-        // });
+        wot.createSensor(ds18b20, function (error, data) {
+            if (error) {
+                log.error('DS18B20 registration fail!!! -> ', error);
+                process.exit(1);
+            } else {
+                // setInterval(function () {
+                //     log.debug('################################');
+                //     wot.getSensorValue('dht11-18', function (err, data) {
+                //         log.info('DHT11 data : ', data);
+                //         log.debug('################################');
+                //     });
+                // }, 3000);
+            }
+        });
 
         wot.createSensor(bh1750fvi, function (error, data) {
             if (error) {
@@ -569,23 +497,23 @@ async.series([
             }
         });
 
-        // wot.createSensor(htu21d, function (error, data) {
-        //     if (error) {
-        //         log.error('HTU21D registration fail!! -> ', error);
-        //         process.exit(1);
-        //     } else {
+        wot.createSensor(htu21d, function (error, data) {
+            if (error) {
+                log.error('HTU21D registration fail!! -> ', error);
+                process.exit(1);
+            } else {
 
-        //     }
-        // });
+            }
+        });
 
-        // wot.createSensor(motion, function (error, data) {
-        //     if (error) {
-        //         log.error('Motion registration fail!!! -> ', error);
-        //         process.exit(1);
-        //     } else {
+        wot.createSensor(motion, function (error, data) {
+            if (error) {
+                log.error('Motion registration fail!!! -> ', error);
+                process.exit(1);
+            } else {
 
-        //     }
-        // });
+            }
+        });
     },
     function (done) {
         done();
@@ -606,35 +534,74 @@ async.series([
     }
 );
 
+function sendCaptureImage(receiver, filename, fileFullPath) {
+    mailOption.subject = 'Capture image';
+    mailOption.attachments = [
+        {
+            fileName: filename,
+            content: fs.createReadStream(fileFullPath),
+            contentType: 'image/jpeg'
+        }
+    ];
+
+    mailTransport.sendMail(mailOption, function (err, response) {
+        if (err) {
+            log.error('메일발송 실패 >>> ', err);
+
+            throw new Error('mail send fail.');
+        }
+
+        mailTransport.close();
+    });
+}
+
+function captureImage(callback) {
+    var filename = 'c_' + new Date().getTime() + '.jpg';
+    var fileFullPath = './' + filename;
+
+    c.getImageAsFile(cameraOption, fileFullPath, function (err){
+        if (err) {
+            log.error('Camera error >>> ', err);
+
+            throw new Error('camera capture fail.');
+        }
+
+        if (callback) {
+            callback(filename, fileFullPath);
+        }
+    });
+}
+
 function addThing() {
-    try {
+    try  {
         // thing 등록 요청
-        var bulbData = {
-            "id": "Bulb",
+        var cameraData = {
+            "id": "Camera",
             "type": "Actuator",
-            "category": "Light",
+            "category": "Camera",
             "attributes": [
                 {
-                    "name": "on",
-                    "description": "Light on",
-                    "type": "bool"
+                    "name": "email",
+                    "description": "receiver email address",
+                    "type": "string"
                 }
             ],
             "operations": [
                 {
                     "type": "setState",
                     "method": "POST",
-                    "uri": wot.makeWPxOperationUri('bulb'),
+                    "uri": wot.makeWPxOperationUri('camera'),
                     "in": [
-                        "on"
+                        "email"
                     ]
                 }
             ]
         };
 
-        wot.addThing('Intel', 'Intel_Edison_with_Arduino', 'Parlor', new Array(bulbData), function (response) {
+        wot.addThing('Raspberry', 'Raspberry_Pi_2_B', 'Enterence', new Array(cameraData), function (response) {
             if (response.statusCode === 204) {
                 // edison에 전송
+                console.log(wot.getThing(WPx_THING_ID));
 
                 var thingData = {"ip": ip.address(), "id": WPx_THING_ID, "data": wot.getThing(WPx_THING_ID)};
 
@@ -662,9 +629,6 @@ function addThing() {
                         addThing();
                     }
                 });
-            } else {
-                log.error('사물 등록 실패');
-                log.error('response code >>> ', response.statusCode);
             }
         });
     } catch (e) {

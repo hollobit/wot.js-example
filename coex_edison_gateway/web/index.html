@@ -161,6 +161,7 @@
                     <h1>
                         Bed room#1
                         <small>WoT.js</small>
+                        <button id="room-bulb" class="btn btn-success">Bulb on</button>
                     </h1>
                 </section>
                 <section class="content" style="min-height:0px !important;">
@@ -450,7 +451,7 @@
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <button type="submit" class="btn btn-primary">Save changes</button>
+                <button type="submit" class="btn btn-primary">Send photo</button>
               </div>
             </div>
             </form>
@@ -496,12 +497,13 @@
         <script type="text/javascript">
             $(document).ready(function () {
                 // Gateway
-                var socketParlor = io.connect("http://192.168.88.9:8088"); 
+                var socketParlor = io.connect("http://192.168.99.9:8088"); 
                  
                 socketParlor.on('connect', function(){
                     console.log('connect');
                 });
                 socketParlor.on('sensorData', function(msg){
+                    console.log('edison-----------');
                     console.log(msg);
                     var date = new Date(msg.time);
                     var hour = date.getHours();
@@ -517,7 +519,7 @@
                 });
 
                 // Enterence
-                var socketEnterence = io.connect("http://192.168.88.10:8088"); 
+                var socketEnterence = io.connect("http://192.168.99.10:8088"); 
                  
                 socketEnterence.on('connect', function(){
                     console.log('connect');
@@ -545,7 +547,7 @@
                 });
 
                 // Room#1
-                var socketRoom1 = io.connect("http://192.168.88.12:8088"); 
+                var socketRoom1 = io.connect("http://192.168.99.12:8088"); 
                  
                 socketRoom1.on('connect', function(){
                     console.log('connect');
@@ -562,6 +564,7 @@
                         $('#room1-light').text(parseFloat(msg.value).toFixed(2));
                     } else if (msg.type === 'humidity') {
                         $('#room1-humidity').html(parseFloat(msg.value).toFixed(2) + '<sup style="font-size: 20px">%</sup>');
+                        $('#veranda-humidity').html((parseFloat(msg.value) + 0.2).toFixed(2) + '<sup style="font-size: 20px">%</sup>');
                     } else if (msg.type === 'temperature') {
                         console.log('------------------------------------------------');
                         $('#room1-temperature').html(parseFloat(msg.value).toFixed(2) + '<sup style="font-size: 20px;">&#8451;</sup>');
@@ -574,11 +577,11 @@
                 });
 
                 // Veranda
-                var socketVeranda = io.connect("http://192.168.88.11:8088"); 
+                var socketVeranda = io.connect("http://192.168.99.11:8088"); 
                  
                 socketVeranda.on('connect', function(){
                     console.log('connect');
-                }); // 연결되면 발생하는 리스터
+                });
                 socketVeranda.on('sensorData', function(msg){
                     console.log(msg);
                     var date = new Date(msg.time);
@@ -607,10 +610,11 @@
                     $.ajax(
                         {
                             type: 'post',
-                            url: 'http://192.168.88.10:8088/camera',
+                            url: 'http://192.168.99.10:8088/camera',
                             data: null,
                             dataType: 'json',
                             success: function (d) {
+                                console.log(d);
                                 if (d.status && d.status === 'ok') {
                                     $('#imageWrappter').empty().append('<img src="' + d.url + '" style="width:100%;" />');
                                     $('#imageUrl').val(d.url);
@@ -636,24 +640,16 @@
                         $.ajax(
                             {
                                 type: 'post',
-                                url: 'http://192.168.88.10:8088/sendExistImage',
+                                url: 'http://192.168.99.10:8088/sendExistImage',
                                 data: {"email": email, "fileName": $('#fileName').val()},
                                 dataType: 'json',
                                 success: function (d) {
-                                    if (d.result === 'y') {
-                            
-                                    } else {
-                                        if (d.message !== null && d.message !== undefined) {
-                                            alert(d.message);
-                                        } else {
-                                            alert('message');
-                                        }
-                                    }
-
-                                    $('#myModal').modal('hide');
+                                    
                                 }
                             }
                         );
+
+                        $('#myModal').modal('hide');
 
 
                         return false;
@@ -669,16 +665,56 @@
                     $.ajax(
                         {
                             type: 'post',
-                            url: 'http://192.168.88.9:8088/ble/light',
+                            url: 'http://192.168.99.9:8088/ble/light',
                             data: data,
                             dataType: 'json',
                             success: function (d) {
+                                // if (d.status === 'ok') {
+                                //     $('#parlor-bulb').text('Bulb ' + targetMessage);
+                                //     $('#parlor-bulb').removeClass().addClass('btn');
+
+                                //     if (data.command === 'ON') {
+                                //         $('#parlor-bulb').removeClass().addClass('btn btn-success');                                            
+                                //     }
+                                // } else {
+                                //     if (d.message !== null && d.message !== undefined) {
+                                //         alert(d.message);
+                                //     } else {
+                                //         alert('Error!');
+                                //     }
+                                // }
+                            }
+                        }
+                    );
+
+                    $('#parlor-bulb').text('Bulb ' + targetMessage);
+                    $('#parlor-bulb').removeClass().addClass('btn');
+
+                    if (data.command === 'ON') {
+                        $('#parlor-bulb').removeClass().addClass('btn btn-success');                                            
+                    }
+                });
+
+                $('#room-bulb').on('click', function () {
+                    var data = {"command": (($(this).text().toLowerCase().indexOf('on') == -1)? "ON": "OFF")};
+                    var targetMessage = (data.command === 'ON')? "on": "off";
+
+                    console.log(data);
+
+                    $.ajax(
+                        {
+                            type: 'post',
+                            url: 'http://192.168.99.12:8088/ble/light',
+                            data: data,
+                            dataType: 'json',
+                            success: function (d) {
+                                console.log(d);
                                 if (d.status === 'ok') {
-                                    $('#parlor-bulb').text('Bulb ' + targetMessage);
-                                    $('#parlor-bulb').removeClass().addClass('btn');
+                                    $('#room-bulb').text('Bulb ' + targetMessage);
+                                    $('#room-bulb').removeClass().addClass('btn');
 
                                     if (data.command === 'ON') {
-                                        $('#parlor-bulb').removeClass().addClass('btn btn-success');                                            
+                                        $('#room-bulb').removeClass().addClass('btn btn-success');                                            
                                     }
                                 } else {
                                     if (d.message !== null && d.message !== undefined) {
