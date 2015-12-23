@@ -6,6 +6,7 @@
 데모는 거실의 Intel Edison + Arduino 보드를 통해 각 보드가 장착되어 있는 센서 및 엑츄에이터를 통해 수치 수집 및 엑츄에이터 제어를 제어하며 WPx(WebPlugin) 시스템과 연동하여 각 보드의 데이터를 취합 및 각 보드별 엑츄에이터를 외부에서 제어할 수 있습니다.
 
 ## 폴더 구조
+**coex_**로 시작하는 폴더와 **tpac_**으로 시작하는 폴더는 동일한 구조이며, TPAC 및 IoT Week를 구분하여 제작되었습니다.
 
 ```bash
 .
@@ -26,9 +27,17 @@
 BBB(Beaglebone Black)의 W1 사용을 위한 초기 설정 shell script가 위치합니다.
 
 2. codex_bbb_room  
-IoT Week 2015용 Beaglebone Black에 적용된 application으로 다음 4가지의 센서를 장착하고 있습니다. 시연시 사용한 cape 정보는 [NeuroMeka](http://wiki.neuromeka.net/index.php?title=SensorCape)에서 확인하실 수 있습니다.
+시연시 사용한 cape 정보는 [NeuroMeka](http://wiki.neuromeka.net/index.php?title=SensorCape)에서 확인하실 수 있습니다. 온도, 습도, 조도, 모션센서를 이용합니다.
 
-3. coex_edison_gateway
+3. coex_edison_gateway  
+Intel Edison + Arduino 쉴드에 BH1750 조도 센서를 장착하였습니다. gateway 역할을 하며, Web Application을 제공하여 각 보드의 센서 파악 및 엑츄에이터(카메라, BLE Blub)등을 제어할 수 있습니다.
 
-Intel Edison + Arduino 쉴드에 BH1750 조도 센서를 장착하였습니다. 
+![WoT Demo Web Application](https://docs.google.com/uc?id=0B02RRVY3KrmeeXZYX3ZzZXRFUnc)
+
+4. codex_rb_enterence  
+카메라를 장착하여 gateway 역할을 하는 Intel Edison의 Web Application에서 해당 카메라를 제어할 수 있습니다.  
+온도, 습도, 조도, 모션센서를 이용합니다.
+
+5. codex_rb_room  
+온도, 습도, 조도, 모션센서를 이용하며 BLE Bulb를 엑츄에이터로 구동합니다.
 
