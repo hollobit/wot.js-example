@@ -2,7 +2,7 @@
 W3C TPAC 2015 및 IoT Week 2015용 Beaglebone Black에 적용된 application으로 다음 4가지의 센서를 장착하고 있습니다. 
 
 * DS1820B
-* BH1750
+* BH1750FVI I2C
 * HTU21D
 * Motion Detector (PIR) sensor
 
