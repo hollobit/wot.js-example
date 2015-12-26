@@ -11,7 +11,6 @@
 ```bash
 .
 ├── bbb_init
-├── ble_scan
 ├── coex_bbb_room
 ├── coex_edison_gateway
 ├── coex_rb_enterence
@@ -39,4 +38,11 @@ Intel Edison + Arduino 쉴드에 BH1750 조도 센서를 장착하였습니다. 
 
 5. codex_rb_room  
 온도, 습도, 조도, 모션센서를 이용하며 BLE Bulb를 엑츄에이터로 구동합니다.
+
+6. edison_init
+Intel Edison + Arduino 사용시 W1, I2C 활성화 스크립트를 포함합니다.
+
+## 기동 순서
+부팅 순서는 상관 없으나 데모 어플리케이션은 반드시 Intel Edison + Arduino 보드를 우선 기동해 주셔야 합니다.  
+기동이 완료된 이후 타 보드는 순서에 상관없이 기동시켜 주시면 됩니다. 또한, 데모에서 사용한 BLE Bulb는 Peripheral ID, Service UUID 및 Characteristic을 미리 상수로 정의하셔야 합니다. 해당 내용은 BLE Bulb 사용 설명서 혹은 개발자 가이드 문서를 참고하시면 됩니다.
 
